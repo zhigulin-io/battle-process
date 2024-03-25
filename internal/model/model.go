@@ -3,6 +3,7 @@ package model
 import "errors"
 
 type Model struct {
+	BaseSize float64
 	Position Position
 }
 
