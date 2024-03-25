@@ -1,100 +1,205 @@
 package game
 
-import (
-	"errors"
-)
+import "github.com/google/uuid"
 
-type UnitState string
+type ActivateAction struct {
+	UnitID uuid.UUID
+}
 
-const (
-	UnitStateAwaiting  UnitState = "awaiting"
-	UnitStateActive    UnitState = "active"
-	UnitStateActivated UnitState = "activated"
-)
+type HoldAction struct {
+}
+
+type AdvanceAction struct {
+}
+
+type RushAction struct {
+}
+
+type ChargeAction struct {
+}
+
+type ShootAction struct {
+}
+
+type FightAction struct {
+}
+
+type Action struct {
+	PlayerID       uuid.UUID
+	ActivateAction *ActivateAction
+	HoldAction     *HoldAction
+	AdvanceAction  *AdvanceAction
+	RushAction     *RushAction
+	ChargeAction   *ChargeAction
+	ShootAction    *ShootAction
+	FightAction    *FightAction
+}
 
 type Unit struct {
-	Owner int       `json:"owner"`
-	State UnitState `json:"state"`
+	Name    string
+	Defence int
+	Quality int
+	State   string
+	Wounds  int
+}
+
+type Player struct {
+	ID uuid.UUID
+
+	Score int
+
+	ActiveUnit     uuid.UUID
+	AwaitingUnits  map[uuid.UUID]*Unit
+	ActivatedUnits map[uuid.UUID]*Unit
 }
 
 type Game struct {
-	Round        int    `json:"round"`
-	ActivePlayer int    `json:"activePlayer"`
-	UnitList     []Unit `json:"unitList"`
+	activePlayer  *Player
+	passivePlayer *Player
 }
 
-func NewGame() *Game {
-	g := Game{
-		Round:        0,
-		ActivePlayer: 0,
-		UnitList:     make([]Unit, 4),
-	}
+func (g *Game) Run() chan Action {
+	actionChan := make(chan Action)
 
-	for i := range g.UnitList {
-		g.UnitList[i] = Unit{
-			Owner: i % 2,
-			State: UnitStateAwaiting,
-		}
-	}
+	go func() {
+		g.gameProcess(actionChan)
+	}()
 
-	return &g
+	return actionChan
 }
 
-func (g *Game) GetState() any {
-	return g
+func (g *Game) gameProcess(actionChan chan Action) {
+	// Deployment Roll-off
+
+	for i := 0; i < 4; i++ {
+		// 1. Round Begin
+
+		// 2. Turns
+		for len(g.activePlayer.AwaitingUnits) != 0 || len(g.passivePlayer.AwaitingUnits) != 0 {
+			if len(g.activePlayer.AwaitingUnits) != 0 {
+				// Activate Unit
+				g.activatePhase(actionChan)
+
+				// Moving
+				performedAction := g.movePhase(actionChan)
+
+				if performedAction == "hold" || performedAction == "advance" {
+					// Shooting
+					g.shootingPhase(actionChan)
+				} else if performedAction == "charge" {
+					// Fighting
+				}
+			}
+			g.switchPlayers()
+		}
+
+		// 3. Round End
+
+	}
 }
 
-func (g *Game) StartActivation(playerID int, unitID int) error {
-	if unitID < 0 || unitID >= len(g.UnitList) {
-		return errors.New("unit id is too small or too large")
-	}
-
-	if playerID != g.ActivePlayer {
-		return errors.New("the player is not active now")
-	}
-
-	if g.UnitList[unitID].Owner != playerID {
-		return errors.New("other player owns this unit")
-	}
-
-	for i := range g.UnitList {
-		if g.UnitList[i].Owner == playerID && g.UnitList[i].State == UnitStateActive {
-			return errors.New("the player has active unit already")
-		}
-	}
-
-	if g.UnitList[unitID].State == UnitStateActivated {
-		return errors.New("this unit is activated already")
-	}
-
-	g.UnitList[unitID].State = UnitStateActive
-
-	return nil
+func (g *Game) switchPlayers() {
+	tmp := g.activePlayer
+	g.activePlayer = g.passivePlayer
+	g.passivePlayer = tmp
 }
 
-func (g *Game) StopActivation(playerID int) error {
-	remainingUnits := 0
-	unitID := -1
-	for i := range g.UnitList {
-		if g.UnitList[i].State == UnitStateAwaiting {
-			remainingUnits++
+func (g *Game) activatePhase(actionChan chan Action) {
+	for {
+		action := <-actionChan
+		if action.PlayerID != g.activePlayer.ID {
+			// write error response
+			continue
 		}
-		if g.UnitList[i].Owner == playerID && g.UnitList[i].State == UnitStateActive {
-			unitID = i
-		}
-	}
-	if unitID == -1 {
-		return errors.New("the player hasn't active unit")
-	}
 
-	g.UnitList[unitID].State = UnitStateActivated
-	g.ActivePlayer = (g.ActivePlayer + 1) % 2
-	if remainingUnits == 0 {
-		g.Round++
-		for i := range g.UnitList {
-			g.UnitList[i].State = UnitStateAwaiting
+		if action.ActivateAction == nil {
+			// write error response
+			continue
 		}
-	}
 
-	return nil
+		_, ok := g.activePlayer.AwaitingUnits[action.ActivateAction.UnitID]
+		if !ok {
+			// write error response
+			continue
+		}
+
+		g.activePlayer.ActiveUnit = action.ActivateAction.UnitID
+		return
+	}
+}
+
+func (g *Game) movePhase(actionChan chan Action) string {
+	for {
+		action := <-actionChan
+		if action.PlayerID != g.activePlayer.ID {
+			// write error response
+			continue
+		}
+
+		if action.HoldAction != nil {
+			// process hold action
+			return "hold"
+		}
+
+		if action.AdvanceAction != nil {
+			// process advance action
+			return "advance"
+		}
+
+		if action.RushAction != nil {
+			// process rush action
+			return "rush"
+		}
+
+		if action.ChargeAction != nil {
+			// process charge action
+			return "charge"
+		}
+
+		// write error response
+	}
+}
+
+func (g *Game) shootingPhase(actionChan chan Action) {
+	for {
+		action := <-actionChan
+		if action.PlayerID != g.activePlayer.ID {
+			// write error response
+			continue
+		}
+
+		if action.ShootAction == nil {
+			// process hold action
+			continue
+		}
+
+		// process shooting action
+		// 1. determine attacks
+		// 2. roll to hit
+		// 3. roll to block
+		// 4. check wound effects
+		return
+	}
+}
+
+func (g *Game) fightingPhase(actionChan chan Action) {
+	for {
+		action := <-actionChan
+		if action.PlayerID != g.activePlayer.ID {
+			// write error response
+			continue
+		}
+
+		if action.FightAction == nil {
+			// process hold action
+			continue
+		}
+
+		// process shooting action
+		// 1. determine attacks
+		// 2. roll to hit
+		// 3. roll to block
+		// 4. check wound effects
+		return
+	}
 }
