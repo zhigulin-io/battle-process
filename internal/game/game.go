@@ -35,6 +35,11 @@ type Action struct {
 	FightAction    *FightAction
 }
 
+type Response struct {
+	Success bool
+	Message *string
+}
+
 type Unit struct {
 	Name    string
 	Defence int
@@ -48,7 +53,7 @@ type Player struct {
 
 	Score int
 
-	ActiveUnit     uuid.UUID
+	ActiveUnit     *Unit
 	AwaitingUnits  map[uuid.UUID]*Unit
 	ActivatedUnits map[uuid.UUID]*Unit
 }
@@ -58,42 +63,43 @@ type Game struct {
 	passivePlayer *Player
 }
 
-func (g *Game) Run() chan Action {
+func (g *Game) Run() (chan Action, chan Response) {
 	actionChan := make(chan Action)
+	responseChan := make(chan Response)
 
 	go func() {
-		g.gameProcess(actionChan)
+		g.gameProcess(actionChan, responseChan)
 	}()
 
-	return actionChan
+	return actionChan, responseChan
 }
 
-func (g *Game) gameProcess(actionChan chan Action) {
+func (g *Game) gameProcess(actionChan chan Action, responseChan chan Response) {
+	// Preparation
 	// Deployment Roll-off
 
 	for i := 0; i < 4; i++ {
 		// 1. Round Begin
+		// Caster points
 
 		// 2. Turns
 		for len(g.activePlayer.AwaitingUnits) != 0 || len(g.passivePlayer.AwaitingUnits) != 0 {
 			if len(g.activePlayer.AwaitingUnits) != 0 {
-				// Activate Unit
-				g.activatePhase(actionChan)
+				g.activatePhase(actionChan, responseChan)
 
-				// Moving
 				performedAction := g.movePhase(actionChan)
 
 				if performedAction == "hold" || performedAction == "advance" {
-					// Shooting
 					g.shootingPhase(actionChan)
 				} else if performedAction == "charge" {
-					// Fighting
+					g.shootingPhase(actionChan)
 				}
 			}
 			g.switchPlayers()
 		}
 
 		// 3. Round End
+		// Scoring
 
 	}
 }
@@ -104,26 +110,30 @@ func (g *Game) switchPlayers() {
 	g.passivePlayer = tmp
 }
 
-func (g *Game) activatePhase(actionChan chan Action) {
+func (g *Game) activatePhase(actionChan chan Action, responseChan chan Response) {
 	for {
 		action := <-actionChan
 		if action.PlayerID != g.activePlayer.ID {
-			// write error response
+			message := "invalid player id"
+			responseChan <- Response{Message: &message}
 			continue
 		}
 
 		if action.ActivateAction == nil {
-			// write error response
+			message := "activation action required"
+			responseChan <- Response{Message: &message}
 			continue
 		}
 
-		_, ok := g.activePlayer.AwaitingUnits[action.ActivateAction.UnitID]
+		unit, ok := g.activePlayer.AwaitingUnits[action.ActivateAction.UnitID]
 		if !ok {
-			// write error response
+			message := "invalid unit id"
+			responseChan <- Response{Message: &message}
 			continue
 		}
 
-		g.activePlayer.ActiveUnit = action.ActivateAction.UnitID
+		g.activePlayer.ActiveUnit = unit
+		delete(g.activePlayer.AwaitingUnits, action.ActivateAction.UnitID)
 		return
 	}
 }
