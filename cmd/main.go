@@ -2,46 +2,36 @@ package main
 
 import (
 	"battle-process/internal/game"
-	"github.com/google/uuid"
 )
 
 func main() {
-	playerA := game.Player{
-		ID:             uuid.New(),
-		Score:          0,
-		ActiveUnit:     nil,
-		AwaitingUnits:  make(map[uuid.UUID]*game.Unit),
-		ActivatedUnits: make(map[uuid.UUID]*game.Unit),
-	}
-	playerB := game.Player{
-		ID:             uuid.New(),
-		Score:          0,
-		ActiveUnit:     nil,
-		AwaitingUnits:  nil,
-		ActivatedUnits: nil,
-	}
+	unitA := game.NewUnit("Test Unit A", 4, 4)
+	playerA := game.NewPlayer()
+	playerA.AddUnit(unitA)
 
-	unit := game.Unit{
-		ID:      uuid.New(),
-		Name:    "Test Unit",
-		Defence: 4,
-		Quality: 4,
-		State:   "test state",
-		Wounds:  0,
-	}
-	playerA.AwaitingUnits[unit.ID] = &unit
+	unitB := game.NewUnit("Test Unit B", 4, 4)
+	playerB := game.NewPlayer()
+	playerB.AddUnit(unitB)
 
 	g := game.Game{
-		ActivePlayer:  &playerA,
-		PassivePlayer: &playerB,
+		ActivePlayer:  playerA,
+		PassivePlayer: playerB,
 	}
 	actionChan, responseChan := g.Run()
 
 	*actionChan <- game.Action{
 		PlayerID:       playerA.ID,
-		ActivateAction: &game.ActivateAction{UnitID: unit.ID},
+		ActivateAction: &game.ActivateAction{UnitID: unitA.GetID()},
 	}
 
+	_ = <-*responseChan
+
+	*actionChan <- game.Action{
+		PlayerID:       playerB.ID,
+		ActivateAction: &game.ActivateAction{UnitID: unitB.GetID()},
+	}
+
+	_ = <-*responseChan
 	_ = <-*responseChan
 	//fmt.Println("Success:", response.Success)
 	//if response.Message != nil {

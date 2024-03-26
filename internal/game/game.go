@@ -43,25 +43,6 @@ type Response struct {
 	Message *string
 }
 
-type Unit struct {
-	ID      uuid.UUID
-	Name    string
-	Defence int
-	Quality int
-	State   string
-	Wounds  int
-}
-
-type Player struct {
-	ID uuid.UUID
-
-	Score int
-
-	ActiveUnit     *Unit
-	AwaitingUnits  map[uuid.UUID]*Unit
-	ActivatedUnits map[uuid.UUID]*Unit
-}
-
 type Game struct {
 	ActivePlayer  *Player
 	PassivePlayer *Player
@@ -102,7 +83,7 @@ func (g *Game) gameProcess(actionChan *chan Action, responseChan *chan Response)
 				//	g.shootingPhase(actionChan)
 				//}
 
-				g.ActivePlayer.ActivatedUnits[g.ActivePlayer.ActiveUnit.ID] = g.ActivePlayer.ActiveUnit
+				g.ActivePlayer.ActivatedUnits[g.ActivePlayer.ActiveUnit.id] = g.ActivePlayer.ActiveUnit
 				g.ActivePlayer.ActiveUnit = nil
 			}
 			log.Println("===== End of Turn =====")
@@ -111,6 +92,11 @@ func (g *Game) gameProcess(actionChan *chan Action, responseChan *chan Response)
 
 		// 3. Round End
 		// Scoring
+		g.ActivePlayer.AwaitingUnits = g.ActivePlayer.ActivatedUnits
+		g.ActivePlayer.ActivatedUnits = make(map[uuid.UUID]*Unit, len(g.ActivePlayer.AwaitingUnits))
+
+		g.PassivePlayer.AwaitingUnits = g.PassivePlayer.ActivatedUnits
+		g.PassivePlayer.ActivatedUnits = make(map[uuid.UUID]*Unit, len(g.PassivePlayer.AwaitingUnits))
 		log.Println("===== Round End =====")
 	}
 }
