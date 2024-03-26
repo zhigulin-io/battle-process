@@ -85,30 +85,33 @@ func (g *Game) gameProcess(actionChan *chan Action, responseChan *chan Response)
 	for i := 0; i < 4; i++ {
 		// 1. Round Begin
 		// Caster points
-		log.Println("Round begin")
+		log.Println("===== Round Begin =====")
 		// 2. Turns
 		for len(g.ActivePlayer.AwaitingUnits) != 0 || len(g.PassivePlayer.AwaitingUnits) != 0 {
-			log.Println("Next Turn")
+			log.Println("===== Turn Begin ======")
+			log.Printf("Turn of Player %s", g.ActivePlayer.ID)
+			log.Printf("Player %s has %d awaiting unit(s)", g.ActivePlayer.ID, len(g.ActivePlayer.AwaitingUnits))
 			if len(g.ActivePlayer.AwaitingUnits) != 0 {
 				g.activatePhase(actionChan, responseChan)
 
-				performedAction := g.movePhase(actionChan)
-
-				if performedAction == "hold" || performedAction == "advance" {
-					g.shootingPhase(actionChan)
-				} else if performedAction == "charge" {
-					g.shootingPhase(actionChan)
-				}
+				//performedAction := g.movePhase(actionChan)
+				//
+				//if performedAction == "hold" || performedAction == "advance" {
+				//	g.shootingPhase(actionChan)
+				//} else if performedAction == "charge" {
+				//	g.shootingPhase(actionChan)
+				//}
 
 				g.ActivePlayer.ActivatedUnits[g.ActivePlayer.ActiveUnit.ID] = g.ActivePlayer.ActiveUnit
 				g.ActivePlayer.ActiveUnit = nil
 			}
+			log.Println("===== End of Turn =====")
 			g.switchPlayers()
 		}
 
 		// 3. Round End
 		// Scoring
-
+		log.Println("===== Round End =====")
 	}
 }
 

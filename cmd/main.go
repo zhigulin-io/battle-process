@@ -2,7 +2,6 @@ package main
 
 import (
 	"battle-process/internal/game"
-	"fmt"
 	"github.com/google/uuid"
 )
 
@@ -43,9 +42,9 @@ func main() {
 		ActivateAction: &game.ActivateAction{UnitID: unit.ID},
 	}
 
-	response := <-*responseChan
-	fmt.Println("Success:", response.Success)
-	if response.Message != nil {
-		fmt.Println("Message:", *response.Message)
-	}
+	_ = <-*responseChan
+	//fmt.Println("Success:", response.Success)
+	//if response.Message != nil {
+	//	fmt.Println("Message:", *response.Message)
+	//}
 }
