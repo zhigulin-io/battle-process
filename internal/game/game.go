@@ -1,6 +1,9 @@
 package game
 
-import "github.com/google/uuid"
+import (
+	"github.com/google/uuid"
+	"log"
+)
 
 type ActivateAction struct {
 	UnitID uuid.UUID
@@ -41,6 +44,7 @@ type Response struct {
 }
 
 type Unit struct {
+	ID      uuid.UUID
 	Name    string
 	Defence int
 	Quality int
@@ -59,32 +63,33 @@ type Player struct {
 }
 
 type Game struct {
-	activePlayer  *Player
-	passivePlayer *Player
+	ActivePlayer  *Player
+	PassivePlayer *Player
 }
 
-func (g *Game) Run() (chan Action, chan Response) {
+func (g *Game) Run() (*chan Action, *chan Response) {
 	actionChan := make(chan Action)
 	responseChan := make(chan Response)
 
 	go func() {
-		g.gameProcess(actionChan, responseChan)
+		g.gameProcess(&actionChan, &responseChan)
 	}()
 
-	return actionChan, responseChan
+	return &actionChan, &responseChan
 }
 
-func (g *Game) gameProcess(actionChan chan Action, responseChan chan Response) {
+func (g *Game) gameProcess(actionChan *chan Action, responseChan *chan Response) {
 	// Preparation
 	// Deployment Roll-off
 
 	for i := 0; i < 4; i++ {
 		// 1. Round Begin
 		// Caster points
-
+		log.Println("Round begin")
 		// 2. Turns
-		for len(g.activePlayer.AwaitingUnits) != 0 || len(g.passivePlayer.AwaitingUnits) != 0 {
-			if len(g.activePlayer.AwaitingUnits) != 0 {
+		for len(g.ActivePlayer.AwaitingUnits) != 0 || len(g.PassivePlayer.AwaitingUnits) != 0 {
+			log.Println("Next Turn")
+			if len(g.ActivePlayer.AwaitingUnits) != 0 {
 				g.activatePhase(actionChan, responseChan)
 
 				performedAction := g.movePhase(actionChan)
@@ -94,6 +99,9 @@ func (g *Game) gameProcess(actionChan chan Action, responseChan chan Response) {
 				} else if performedAction == "charge" {
 					g.shootingPhase(actionChan)
 				}
+
+				g.ActivePlayer.ActivatedUnits[g.ActivePlayer.ActiveUnit.ID] = g.ActivePlayer.ActiveUnit
+				g.ActivePlayer.ActiveUnit = nil
 			}
 			g.switchPlayers()
 		}
@@ -105,43 +113,44 @@ func (g *Game) gameProcess(actionChan chan Action, responseChan chan Response) {
 }
 
 func (g *Game) switchPlayers() {
-	tmp := g.activePlayer
-	g.activePlayer = g.passivePlayer
-	g.passivePlayer = tmp
+	tmp := g.ActivePlayer
+	g.ActivePlayer = g.PassivePlayer
+	g.PassivePlayer = tmp
 }
 
-func (g *Game) activatePhase(actionChan chan Action, responseChan chan Response) {
+func (g *Game) activatePhase(actionChan *chan Action, responseChan *chan Response) {
 	for {
-		action := <-actionChan
-		if action.PlayerID != g.activePlayer.ID {
+		action := <-*actionChan
+		if action.PlayerID != g.ActivePlayer.ID {
 			message := "invalid player id"
-			responseChan <- Response{Message: &message}
+			*responseChan <- Response{Message: &message}
 			continue
 		}
 
 		if action.ActivateAction == nil {
 			message := "activation action required"
-			responseChan <- Response{Message: &message}
+			*responseChan <- Response{Message: &message}
 			continue
 		}
 
-		unit, ok := g.activePlayer.AwaitingUnits[action.ActivateAction.UnitID]
+		unit, ok := g.ActivePlayer.AwaitingUnits[action.ActivateAction.UnitID]
 		if !ok {
 			message := "invalid unit id"
-			responseChan <- Response{Message: &message}
+			*responseChan <- Response{Message: &message}
 			continue
 		}
 
-		g.activePlayer.ActiveUnit = unit
-		delete(g.activePlayer.AwaitingUnits, action.ActivateAction.UnitID)
+		g.ActivePlayer.ActiveUnit = unit
+		delete(g.ActivePlayer.AwaitingUnits, action.ActivateAction.UnitID)
+		*responseChan <- Response{Success: true}
 		return
 	}
 }
 
-func (g *Game) movePhase(actionChan chan Action) string {
+func (g *Game) movePhase(actionChan *chan Action) string {
 	for {
-		action := <-actionChan
-		if action.PlayerID != g.activePlayer.ID {
+		action := <-*actionChan
+		if action.PlayerID != g.ActivePlayer.ID {
 			// write error response
 			continue
 		}
@@ -170,10 +179,10 @@ func (g *Game) movePhase(actionChan chan Action) string {
 	}
 }
 
-func (g *Game) shootingPhase(actionChan chan Action) {
+func (g *Game) shootingPhase(actionChan *chan Action) {
 	for {
-		action := <-actionChan
-		if action.PlayerID != g.activePlayer.ID {
+		action := <-*actionChan
+		if action.PlayerID != g.ActivePlayer.ID {
 			// write error response
 			continue
 		}
@@ -192,10 +201,10 @@ func (g *Game) shootingPhase(actionChan chan Action) {
 	}
 }
 
-func (g *Game) fightingPhase(actionChan chan Action) {
+func (g *Game) fightingPhase(actionChan *chan Action) {
 	for {
-		action := <-actionChan
-		if action.PlayerID != g.activePlayer.ID {
+		action := <-*actionChan
+		if action.PlayerID != g.ActivePlayer.ID {
 			// write error response
 			continue
 		}

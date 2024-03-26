@@ -2,25 +2,50 @@ package main
 
 import (
 	"battle-process/internal/game"
-	"battle-process/internal/server"
-	"log"
-	"net/http"
+	"fmt"
+	"github.com/google/uuid"
 )
 
 func main() {
-	g := game.NewGame()
+	playerA := game.Player{
+		ID:             uuid.New(),
+		Score:          0,
+		ActiveUnit:     nil,
+		AwaitingUnits:  make(map[uuid.UUID]*game.Unit),
+		ActivatedUnits: make(map[uuid.UUID]*game.Unit),
+	}
+	playerB := game.Player{
+		ID:             uuid.New(),
+		Score:          0,
+		ActiveUnit:     nil,
+		AwaitingUnits:  nil,
+		ActivatedUnits: nil,
+	}
 
-	srv := server.NewServer(g)
+	unit := game.Unit{
+		ID:      uuid.New(),
+		Name:    "Test Unit",
+		Defence: 4,
+		Quality: 4,
+		State:   "test state",
+		Wounds:  0,
+	}
+	playerA.AwaitingUnits[unit.ID] = &unit
 
-	http.HandleFunc("/connect", srv.ConnectAsPlayer)
+	g := game.Game{
+		ActivePlayer:  &playerA,
+		PassivePlayer: &playerB,
+	}
+	actionChan, responseChan := g.Run()
 
-	http.HandleFunc("/state", srv.GetGameState)
+	*actionChan <- game.Action{
+		PlayerID:       playerA.ID,
+		ActivateAction: &game.ActivateAction{UnitID: unit.ID},
+	}
 
-	http.HandleFunc("/activation/start", srv.StartActivation)
-	http.HandleFunc("/activation/stop", srv.StopActivation)
-
-	err := http.ListenAndServe(":8080", nil)
-	if err != nil {
-		log.Fatal(err)
+	response := <-*responseChan
+	fmt.Println("Success:", response.Success)
+	if response.Message != nil {
+		fmt.Println("Message:", *response.Message)
 	}
 }
