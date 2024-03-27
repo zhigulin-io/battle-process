@@ -19,20 +19,20 @@ func main() {
 	}
 	actionChan, responseChan := g.Run()
 
-	*actionChan <- game.Action{
+	actionChan <- game.Action{
 		PlayerID:       playerA.ID,
 		ActivateAction: &game.ActivateAction{UnitID: unitA.GetID()},
 	}
 
-	_ = <-*responseChan
+	_ = <-responseChan
 
-	*actionChan <- game.Action{
+	actionChan <- game.Action{
 		PlayerID:       playerB.ID,
 		ActivateAction: &game.ActivateAction{UnitID: unitB.GetID()},
 	}
 
-	_ = <-*responseChan
-	_ = <-*responseChan
+	_ = <-responseChan
+	_ = <-responseChan
 	//fmt.Println("Success:", response.Success)
 	//if response.Message != nil {
 	//	fmt.Println("Message:", *response.Message)
